@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Inner Harbor Forum</title>
+<link rel="stylesheet" href="IHF.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!--Time Modules-->
+<script src="https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs/plugin/relativeTime.js"></script>
+<!--Leo Profanity-->
+</head>
+
+<body>
+  <div class="background-overlay"></div>
+  <div id="loader"></div>
+  <div class="snow"></div>
+  <div id="form-container">
+    <h1 class="typing">Inner Harbor Forum</h1>
+    <input type="text" placeholder="Your Name (optional)" id="name">
+    <br>
+    <textarea placeholder="Your message.." id="message" maxlength="1000" rows="4" cols="5"></textarea>
+    <br>
+    <button id="post-button" class="button-animate">Post</button>
+    <p id="char-count">0 / 1000 characters</p>
+    <p id="post-count">0 thoughts floated through today’s harbor.</p>
+  </div>
+  <div id="posts"></div>
+  <button class="darkmode" class="button-animate" onclick="activateDarkMode()">✧ Toggle Mode</button>
+
+  <div id="lantern-container">
+  </div>
+  <audio id ="bday-audio" src ="happy-birthday-334876.mp3" preload="auto"></audio>
+  <!-- User Login -->
+    <button id="user-login-panel">User Login(WIP)</button>
+    <!-- Hidden User Panel -->
+      <div id="user-auth-panel" class="auth-panel" style="display: none;">
+
+      <input type="text", id="username" placeholder="Username (Signup Only)" style="display: none;" required/>
+      <input type="email" id="email" placeholder="Email" required />
+      <input type="password" id="password" placeholder="Password" required/><br>
+
+      <button id="user-login-btn">Login</button>
+      <button id="signup-btn" style="display: none;">Signup</button>
+      <p id="forgot" style ="cursor: pointer; color: blue;" onclick="resetPassword()">Forgot Password?</p>
+    
+      <p id="auth-toggle" style="cursor: pointer">New Here? Switch to Signup</p>
+      <p id="auth-msg"></p>
+    </div>
+  
+
+  <!-- Admin Login Toggle Button -->
+  <button id="admin-toggle">Admin Login</button>
+  <div id="login-panel">
+    <input type="email" id="admin-email" placeholder="Admin Email">
+    <input type="password" id="admin-password" placeholder="Password">
+    <button id="login-btn">Login</button>
+  </div>
+
+  <!-- Firebase Script (Module) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+    import leoProfanity from 'https://cdn.skypack.dev/leo-profanity';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDZb940J6NlhMCBl932yXRKdmd0NjR6u2w",
+      authDomain: "inner-harbor-forum.firebaseapp.com",
+      projectId: "inner-harbor-forum",
+      storageBucket: "inner-harbor-forum.appspot.com",
+      messagingSenderId: "864804056409",
+      appId: "1:864804056409:web:09a0c133cb012429d8b048",
+      measurementId: "G-TQZK7S32BZ"
+    };
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
+    const auth = getAuth();
+
+    //Slang Addition
+    const indSlangs = [
+    "kutte", "kutta", "harami", "randi", "r@ndi", "mc", "bc", "mkc", "madarchod", "m@darchod", "mad@rchod", "m@d@rchod", "m@d@rch0d", "behen ka lauda", "gandu", "laude", "chutiya", "betichod", "betich0d", "bhosdike", "sala", "chodu", "choda", "chod", "chut", 
+                       "kutte,", "kutta,", "harami,", "randi,", "r@ndi,", "mc,", "bc,", "mkc,", "madarchod,", "m@darchod,", "mad@rchod,", "m@d@rchod,", "m@d@rch0d,", "behen ka lauda,", "gandu,", "laude,", "chutiya,", "betichod,", "betich0d,", "bhosdike,", "sala,", "chodu,", "choda,", "chod,", "chut,",
+                        ]
+    const indSlangs2 = [
+    // Highly explicit
+    "bhosdi", "bhosdike", "bhos*dike", "b h o s d i", "b#osdi",
+    "behenchod", "bhenchod", "behnchod", "behen ch*d", "b h e n c h o d", "b#nch*d",
+    "madarchod", "madar ch*d", "m@darchod", "m a d a r c h o d", "m@d@rch*d",
+    "lund", "l u n d", "l*nd", "l0nd", "l0nda", "l0da",
+    "gandu", "g a n d u", "g@ndu", "g@ndoo", "g4ndu",
+    "gaand", "g@and", "g*nd", "g a a n d",
+    "randi", "r@ndi", "r4ndi", "r a n d i",
+    "chod", "choda", "chodu", "chodna", "ch*d", "c h o d", "ch0d",
+    "loda", "l*da", "l0da", "l o d a",
+    "chutiya", "chutya", "ch*tiya", "chut!ya", "c h u t i y a", "ch00tiya",
+    "maa ki chut", "m@a ki ch*t", "m a a k i c h u t", "maaki chut",
+    "teri maa ki chut", "t3ri m@a ki ch*t", "teri maaki ch*t", "t e r i m a a k i c h u t",
+    "chut", "choot", "ch*ot", "ch**t", "ch@t", "ch#t", "choot!ya", "cho0t",
+
+    // Mild insults
+    "harami", "haraami", "h@rami", "h a r a m i",
+    "kameena", "kamina", "k4mina", "k@m!na",
+    "kutte", "kuttiya", "kutti", "kutta", "k u t t a", "k@tte",
+    "saala", "saali", "s@ala", "s4la", "s a l a",
+    "chakka", "ch@kka", "c h a k k a",
+    "bakchod", "bakch*d", "b a k c h o d", "b@kchod",
+    "jhaant", "jh@ant", "j h a a n t",
+    "ullu ka pattha", "ullu", "ulloo", "u l l u", "u11u",
+
+    // Contextual/offensive
+    "item", "pataka", "cheapde", "cheapdi", "ch**pde", "tapori", "jhalla", "katela",
+    "bhadwa", "bhadva", "bhadvi", "bh@dwa", "b h a d w a",
+
+    // Slurs & sensitive terms
+    "chakka", "c h a k k a", "ch@kka", "tr@nny", "shemale", "ladyboy", // Cross-cultural slurs
+    "bsdk", "bs*d*ke", "bh0sdike", "bh@sd!ke", "bhusdi", "bhusdee",
+    "mc", "m*c", "madarjhat", "madarjhoot",
+    "bhen ke l***", "bhenke", "behnk*", "b h e n k e",
+    "mc bc", "mcbc", "mcbc", "bcmc",
+    "ma ki chut", "maaki chut", "maa ki c*ut",
+    "chodu", "chodu saala", "ch*du", "chuddakhor",
+    "chuss", "choos", "chusne", "choosa", "chusva",
+    "bhadve", "bhadwaa", "bhand", "bhadwa sale",
+    "gand mara", "gaand mara", "gaandfattu", "gaandfat",
+    "tatti", "t@tti", "taati", "taaty", "shauch", "susu",
+    "lundya", "lundbaaz", "lundfodu",
+    "chootmar", "chutmaar", "chootfaad", "chutfad",
+    "kutiya", "kutia", "kuthe", "kutti", "kutty", "kutti saala",
+
+    // Phonetic misspellings
+    "ghanta", "ganta", "gaand", "gaad", "gund", "g@nd",
+    "suar", "sooar", "suw@r", "s u a r", // pig - often used derogatorily
+
+    // Harassment / suggestive words (depending on context)
+    "maal", "m@al", "sexy", "s3xy", "hotty", "item girl", "randi khana"
+    ];
+
+    leoProfanity.add(indSlangs);
+    leoProfanity.add(indSlangs2);
+
+    //Elements for login button
+    const openBtn = document.getElementById("user-login-panel"); // updated to match HTML
+    const userPanel = document.getElementById("user-auth-panel");
+    const toggle = document.getElementById("auth-toggle"); 
+    const forgotBtn = document.getElementById("forgot"); // updated to match HTML
+    const userLoginBtn = document.getElementById("user-login-btn");
+    const userSignupBtn = document.getElementById("signup-btn");
+
+    const title = document.createElement("h2"); // create a title dynamically
+    title.id = "auth-title";
+    title.innerText = "User Login";
+    title.className = "user-login";
+    userPanel.insertBefore(title, userPanel.firstChild); // insert title at the top
+
+    const user = document.getElementById("username")
+    const email = document.getElementById("email") // updated to match HTML
+    const pass = document.getElementById("password") // updated to match HTML
+    const msg = document.getElementById("auth-msg");
+
+    let postCount = 0;
+    let currentUserRole = null;
+    const snowContainer = document.querySelector('.snow'); //for snow effect
+    const snowflakeCount = 150;
+  
+    // Force sign-out on page load
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // User is signed in, so force logout
+    signOut(auth)
+      .then(() => {
+        console.log("User signed out on page load.");
+        const toggleBtn = document.getElementById("admin-toggle");
+        if (toggleBtn) {
+          toggleBtn.innerText = "Admin Login";
+        }
+      })
+      .catch((error) => {
+        console.error("Sign-out failed on load:", error.message);
+      });
+  } else {
+    // No user signed in already
+    console.log("No user signed in on page load.");
+    const toggleBtn = document.getElementById("admin-toggle");
+    if (toggleBtn) {
+      toggleBtn.innerText = "Admin Login";
+    }
+  }
+});
+
+    //Login/Signup toggle
+    let isLogin = true;
+    
+    openBtn.onclick= () => {
+      userPanel.style.display = (userPanel.style.display === "none") ? "block" : "none";
+      title.style.transition = "ease-in-and-out 2s"
+    }; 
+
+    toggle.onclick = () => {
+      isLogin = !isLogin;
+      title.innerText = isLogin ? "User Login" : "User Signup";
+      username.style.display = isLogin? "none" : "block";
+      userLoginBtn.style.display = isLogin? "inline-block" : "none";
+      userSignupBtn.style.display = isLogin? "none" : "inline-block";
+      toggle.innerText = isLogin ? "New Here? Switch to Signup" : "Already have an account? Switch to Login";
+      msg.innerText = "";
+    };
+    userLoginBtn.onclick = async () => {
+      if(!email.value || !pass.value) return showToast("Enter email and password.");
+      userLoginBtn.disabled = true;
+      showLoader();
+
+      try{
+        await signInWithEmailAndPassword (auth, email.value, pass.value);
+        showToast("Login successful! Redirecting...");
+        userPanel.style.display = "none"; // Hide login form
+        document,getElementById("welcome-message").innerText = `Welcome, ${auth.currentUser.displayName || "User"}`
+        document.getElementById("logout-btn").style.display = "inline-block";
+      } catch (e) {
+        showToast("Login Failed: " + e.message, true);
+      } finally {
+        userLoginBtn.disabled = false;
+        hideLoader();
+      }
+    };
+    //SignUp
+    userSignupBtn.onclick = async() => {
+      if(!email.value || !pass.value || !user.value) return showToast("Fill all fields.");
+      if(email.value === "shekharxshashank@gmail.com" || email.value === "innerharborquest@gmail.com") return showToast("You're an admin.")
+      if(!/^[a-z A-Z 0-9 _]{3,15}$/.test(user.value)) return showToast("Username must be 3-15 characters (letters, numbers, _)");
+      if(pass.value.length <6) return showToast("Password must be at least 6 characters.");
+      userSignupBtn.disabled = true;
+      showLoader();
+
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, email.value, pass.value);
+        await updateProfile(userCred.user, { displayName: user.value });
+        showToast("Signup successful! Redirecting...");
+        setTimeout(() => location.href = "IHF.html", 1500); //reload() -> IHF.html
+      } catch (e) {
+        showToast("Signup failed: " + e.message);
+      } finally {
+        userSignupBtn.disabled = false;
+        hideLoader();
+      }
+    };
+    //Forgot Password
+    
+    window.resetPassword = async () => {
+
+      if (!email.value) return showToast("Enter your email first!");
+      if(email.value === "shekharxshashank@gmail.com" || email.value === "innerharborquest@gmail.com") return showToast("You're an admin.")
+      try {
+        forgotBtn.disabled = true;
+        showLoader();
+        await sendPasswordResetEmail(auth, email.value);
+        showToast("Reset email sent!");
+      } catch (e){
+        showToast("Error: " + e.message);
+      } finally {
+        forgotBtn.disabled = false;
+        hideLoader();
+      }
+    };
+
+    //Show::Hide Loader
+    function showLoader() {
+      document.getElementById("loader").style.display = "block";
+    }
+    function hideLoader() {
+      document.getElementById("loader").style.display = "none";
+    }
+    //Special Happy Birthday Audio
+    function isTodayBirthday() {
+      const today = new Date();
+      return today.getDate() === 10 && today.getMonth() === 6; //July = 6
+      console.log("Today is birthday!!");
+    }
+    //character counter
+    message.addEventListener("input", () => {
+      const count = message.value.length;
+      document.getElementById("char-count").innerText = `${count} / 1000 characters`;
+    });
+    function createSnowflake() {
+      const flake = document.createElement('div');
+      flake.classList.add('snowflake');
+
+      //Random size, horizontal position, speed, delay, drift, etc
+      const size = Math.random() * 4 + 1;
+      flake.style.width = `${size}px`;
+      flake.style.height = `${size}px`;
+
+      flake.style.left = `${Math.random() * 100}vw`;
+
+      flake.style.animationDuration = `${5 + Math.random() * 5}s`;
+
+      flake.style.animationDelay = `${Math.random() * 5}`;
+
+      flake.style.setProperty('--drift', `${Math.random() * 50 - 25}px`);
+
+      snowContainer.appendChild(flake);
+
+      setTimeout(() => {
+        flake.remove();
+      }, 10000); //long enough
+    }
+    setInterval(createSnowflake, 150);
+
+    //Lanterns
+    function showLanterns() {
+      const lastShown = localStorage.getItem("lanternLastShown");
+      const today = new Date().toDateString();
+
+      if(lastShown === today) return;
+
+      localStorage.setItem("lanternLastShown", today);
+      releaseLanterns(13); //<- launches +10 lanterns
+    }
+    async function tryPlayBirthdayTune(user) {
+      if (CREATORS.includes(user.email) && isTodayBirthday()) {
+        const audio = document.getElementById("bday-audio");
+
+        try {
+          await audio.play();
+          console.log("🎶 Birthday tune playing!");
+        } catch (err) {
+            console.warn("Autoplay blocked. Waiting for interaction...");
+
+            // Show subtle toast or prompt
+            showToast("Tap anywhere to have your birthday surprise 🎁");
+
+            // Wait for first interaction
+            const unlock = () => {
+              audio.play();
+              window.removeEventListener("click", unlock);
+            };
+          window.addEventListener("click", unlock);
+        }
+      }
+    }
+
+    function releaseLanterns(count) {
+    const container = document.getElementById("lantern-container");
+
+    for (let i = 0; i < count; i++) {
+      const lantern = document.createElement("div");
+      lantern.classList.add("lantern");
+
+      const size = Math.random() * 20 + 20; // 20 to 40 px
+      lantern.style.width = `${size}px`;
+      lantern.style.height = `${size * 1.5}px`;
+
+      lantern.style.position = "absolute";
+      lantern.style.bottom = "0px";
+
+      // Random horizontal position
+      lantern.style.left = `${Math.random() * 90 + 5}vw`; // keep it in bounds
+
+      // Random brightness
+      lantern.style.opacity = `${Math.random() * 0.5 + 0.5}`;
+
+      // Unique animation timing
+      const duration = 8 + Math.random() * 5; // seconds
+      const delay = Math.random() * 2;
+
+      lantern.style.animation = `floatLantern ${duration}s ease-in infinite`;
+      lantern.style.animationDelay = `${delay}s`;
+
+      container.appendChild(lantern);
+
+      setTimeout(() => {
+        lantern.remove();
+      }, (duration + delay) * 1000);
+    }
+  }
+  
+  function cleanWithEmoji(text) {
+  const badWords = leoProfanity.list();  // 💥 if leoProfanity is undefined, this crashes
+  const emojiBank = ["😎", "🤐", "🥴", "💩", "🧃", "🚫", "🌶️", "🍌", "🙈", "🦄", "✨", "🎉", "🎊", "🌟", "💫", "🧁", "🍥", "🍰", "🎂"];
+
+  const regex = new RegExp(
+    `\\b(${indSlangs2
+    .map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join("|")})\\b`,
+  "gi"
+  );
+
+  return text.replace(regex, () => {
+    const emoji = emojiBank[Math.floor(Math.random() * emojiBank.length)];
+    return emoji;
+  });
+}
+
+    async function submitPost() {
+      const postButton = document.getElementById("post-button");
+      postButton.disabled = true;
+      postButton.innerText = "Posting...";
+      showLanterns();
+
+      const name = document.getElementById("name").value.trim();
+      const message = document.getElementById("message").value.trim();
+
+      const count = 0;
+      document.getElementById("char-count").innerText = `${count} / 1000 characters`
+
+      const cleanName = cleanWithEmoji(name);
+      const cleanMessage = cleanWithEmoji(message);
+      
+      if (!cleanMessage) { 
+        postButton.disabled = false;
+      postButton.innerText = "Post";
+        return showToast("Hey friend, you forgot to write something."); 
+      }
+
+      const user = auth.currentUser;
+      const createdBy = user ? user.email : "guest";
+
+      showLoader();
+      try {
+        const docRef = await addDoc(collection(db, "posts"), {
+          name: cleanName || "Anonymous",
+          cleanMessage,
+          email: (user && user.email) || "",
+          timestamp: serverTimestamp(),
+          createdBy
+        });
+        displayPost({ name: cleanName, cleanMessage, email: (user && user.email) || "" }, docRef.id, user);
+      } catch (err) {
+        console.error("Error:", err);
+        showToast("Could not save your post.");
+        return;
+      }
+      hideLoader();
+      postButton.disabled = false;
+      postButton.innerText = "Post";
+
+      postCount++;
+      updateCountText();
+      document.getElementById("name").value = "";
+      document.getElementById("message").value = "";
+      document.getElementById("message").style.height = "auto";
+      document.getElementById("message").style.transition = "height 0.2s ease";
+    }
+    message.addEventListener("input", () => {
+      message.style.height = "auto";
+      message.style.height = message.scrollHeight + "px";
+    });
+
+    function displayPost(data, id, user = auth.currentUser) {
+      dayjs.extend(dayjs_plugin_relativeTime);
+      const timeAgo = dayjs(data.timestamp?.toDate()).fromNow();
+
+      const postBox = document.createElement("div"); //Post
+      postBox.className = "post";
+
+      //Container for author & time
+      const metaInfo = document.createElement("div");
+      metaInfo.className = "post-meta";
+
+      const author = getDisplayNameWithSingleTag(data.name, data.email); //reusing the function.
+      author.classList.add("post-author");
+
+      const time = document.createElement("div"); //time
+      time.className = "post-time";
+      time.innerText = `⏱ ${timeAgo}`;
+
+      metaInfo.appendChild(author);
+      metaInfo.appendChild(time);
+
+      //message
+      const fullmsg = (data.cleanMessage || "").replace(/\n/g, "<br>");
+      const maxLength = 200;
+
+      const msg = document.createElement("div");
+      msg.className = "post-message";
+
+      if (fullmsg.length > maxLength) {
+        const preview = fullmsg.substring(0, maxLength);
+
+        const previewSpan = document.createElement("span");
+        previewSpan.innerHTML = preview + "... ";
+
+        const fullSpan = document.createElement("span");
+        fullSpan.innerHTML = fullmsg;
+        fullSpan.style.display = "none";
+
+        const toggleBtn = document.createElement("button");
+        toggleBtn.textContent = "Show More";
+        toggleBtn.className = "toggle-msg";
+
+        let expanded = false;
+        toggleBtn.onclick = () => {
+          expanded = !expanded;
+          previewSpan.style.display = expanded ? "none" : "inline";
+          fullSpan.style.display = expanded ? "inline" : "none";
+          toggleBtn.textContent = expanded ? "Show Less" : "Show More";
+        };
+
+        msg.appendChild(previewSpan);
+        msg.appendChild(fullSpan);
+        msg.appendChild(toggleBtn);
+      } else {
+        msg.innerHTML = fullmsg;
+      }
+
+      postBox.appendChild(metaInfo);
+      postBox.appendChild(msg);
+
+      //comments section
+      document.getElementById("posts").prepend(postBox);
+
+      const commentSection = document.createElement("div");
+      commentSection.className = "comment-section";
+       
+      const commentList = document.createElement("div");
+      commentList.className = "comment-list";
+       
+      const commentForm = document.createElement("div");
+      commentForm.className = "comment-form";
+
+      const commentInput = document.createElement("input");
+      commentInput.placeholder = "Add a comment...";
+      commentInput.className = "comment-input";
+
+      const commentBtn = document.createElement("button");
+      commentBtn.className = "comment-button";
+      commentBtn.innerText = "Reply";
+      commentBtn.disabled = false
+
+      commentInput.addEventListener("input", () => {
+        commentBtn.disabled = !commentInput.value.trim();
+      });
+
+      commentForm.appendChild(commentInput);
+      commentForm.appendChild(commentBtn);
+      commentSection.appendChild(commentList);
+      commentSection.appendChild(commentForm);
+      postBox.appendChild(commentSection);
+
+      //Delete Button
+      if ((currentUserRole === "admin") || (currentUserRole === "creator")) {
+        const delBtn = document.createElement("button");
+        delBtn.innerText = "🗑 Delete";
+        delBtn.className = "delete-btn";
+        delBtn.onclick = () => deletePost(id, postBox);
+        postBox.appendChild(delBtn);
+      }
+
+
+      loadComments(id, commentList);
+
+      //adding comments
+      commentBtn.onclick = async () => {
+        const text = commentInput.value.trim();
+        if (!text) return showToast("Say something soft...");
+        commentBtn.disabled = true;
+
+        try {
+          const commentRef = collection(db, "posts", id, "comments");
+          await addDoc(commentRef, {
+            name: name || "Anonymous",
+            email: user?.email || "",
+            message: cleanWithEmoji(text),
+            timestamp: serverTimestamp()
+          });
+          
+
+        commentInput.value = "";
+        showToast("Comment Added");
+        loadComments(id, commentList);
+      }
+      catch (e) {
+        showToast("Could not post your comment.");
+        console.error(e);
+      }
+      commentInput.dispatchEvent(new Event("input"));
+    };
+  }
+
+    //loading comments
+    async function loadComments(postId, container) {
+      container.innerHTML = "";
+      const q = query(collection(db, "posts", postId, "comments"), orderBy("timestamp"));
+      const snap = await getDocs(q);
+      snap.forEach(doc => {
+        const data = doc.data();
+        const comment = document.createElement("div");
+        comment.className = "comment";
+
+        const line = document.createElement("div");
+
+        const authorSpan = getDisplayNameWithSingleTag(data.name, data.email); //function call
+
+        const messageSpan = document.createElement("span");
+        messageSpan.className = "comment-message";
+        messageSpan.innerHTML = `: ${data.message.replace(/\n/g, "<br>")}`;
+
+        line.appendChild(authorSpan);
+        line.appendChild(messageSpan);
+
+        comment.appendChild(line);
+
+        comment.classList.add("fadeIn");
+        container.prepend(comment);
+      });
+    }
+    //Tags in comments
+    function getDisplayNameWithSingleTag(name, email) {
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = name || "Anonymous";
+
+      const wrapper = document.createElement("span");
+      wrapper.appendChild(nameSpan);
+
+      if (email) {
+        if (ADMINS.includes(email)) {
+          const adminTag = document.createElement("span");
+          adminTag.className = "role-tag admin-tag";
+          adminTag.textContent = " [Admin] ";
+          wrapper.appendChild(adminTag);
+        } else if (CREATORS.includes(email)) {
+          const creatorTag = document.createElement("span");
+          creatorTag.className = "role-tag creator-tag";
+          creatorTag.textContent = " [Creator] ";
+          wrapper.appendChild(creatorTag);
+        }
+      }
+      return wrapper;
+    }
+
+
+    //Deleting Comments
+    async function deleteComments(postId) {
+      const commentsRef = collection(db, "posts", postId, "comments");
+      const snap = await getDocs(commentsRef);
+      const deletions = snap.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletions);
+    }
+
+    async function loadPosts() {
+
+      const q = query(collection(db, "posts"), orderBy("timestamp"));
+      const snap = await getDocs(q);
+
+      let validPosts = 0;
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate?.();
+
+        if(timestamp) {
+          const now = new Date();
+          const ageInMs = now - timestamp;
+          const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+
+          if (ageInDays > 7) {
+            await deleteDoc(doc.ref);
+            console.log(`Deleted old posts: ${doc.id}`);
+            continue;
+          }
+        }
+      displayPost(doc.data(), doc.id);
+      validPosts++;
+    }
+    postCount = validPosts;
+    updateCountText();
+  }
+
+    function updateCountText() {
+      const countEl = document.getElementById("post-count");
+      if (postCount === 0) countEl.innerText = "Be the first one to let your thought sail through the harbor.";
+      else if (postCount === 1) countEl.innerText = "1 thought floated through today’s harbor.";
+      else countEl.innerText = `${postCount} thoughts floated through today’s harbor.`;
+    }
+
+    async function deletePost(postId, postElement) {
+      const confirmDelete = await showConfirm("Are you sure you want to delete this post?");
+      if (!confirmDelete) return;
+      showLoader();
+      
+      try {
+        await deleteComments(postId);
+        await deleteDoc(doc(db, "posts", postId));
+
+        postElement.style.transition = "opacity 0.6s ease, transform 0.6s ease";
+        postElement.style.opacity = "0";
+        postElement.style.transform = "scale(0.95)";
+      setTimeout(() => {
+        postElement.remove();
+      }, 400);
+      showToast("Post Deleted.");
+      postCount--;
+      updateCountText();
+      }catch (error) {
+      showToast("Error deleting post: " + error.message);
+      }
+      hideLoader();
+    }
+    function showConfirm(message) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.className = "confirm-overlay";
+
+        const box = document.createElement("div");
+        box.className = "confirm-box";
+
+        const cnfmsg = document.createElement("h3");
+        cnfmsg.innerText = message;
+
+        const yesBtn = document.createElement("button");
+        yesBtn.innerText = "Yes";
+        yesBtn.className = "confirm-btn cnfBtnYes";
+        
+        const noBtn = document.createElement("button");
+        noBtn.innerText = "Cancel";
+        noBtn.className = "confirm-btn cnfBtnNo";
+
+        yesBtn.onclick = () => {
+          document.body.removeChild(overlay);
+          resolve(true);
+        };
+        noBtn.onclick = () => {
+          document.body.removeChild(overlay);
+          resolve(false);
+        };
+
+        box.appendChild(cnfmsg);
+        box.appendChild(yesBtn);
+        box.appendChild(noBtn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+      });
+    }
+    function showToast(message) {
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.innerText = message;
+      console.log("message: " + message);
+
+      document.body.appendChild(toast);
+      setTimeout(() => {
+          toast.style.opacity = 0;
+          toast.style.transition = "opacity 0.5s ease";
+          setTimeout(() => document.body.removeChild(toast), 500);
+      }, 2500);
+      }
+
+    // Auth handling
+    let isPanelVisible = false;
+    const ADMINS = ["shekharxshashank@gmail.com"];
+    const CREATORS = ["innerharborquest@gmail.com"];
+
+    const toggleBtn = document.getElementById("admin-toggle");
+    const loginPanel = document.getElementById("login-panel");
+    const loginBtn = document.getElementById("login-btn");
+    toggleBtn.addEventListener("click", () => {
+      isPanelVisible = !isPanelVisible;
+      loginPanel.style.display = loginPanel.style.display === "block" ? "none" : "block";
+    });
+    //Hide panel if clicking outside it
+    document.addEventListener("click", (e) => {
+        if (
+            isPanelVisible &&
+            !loginPanel.contains(e.target) &&
+            e.target !== toggleBtn
+        ) {
+            isPanelVisible = false;
+            loginPanel.style.display = "none";
+        }
+        });
+
+   loginBtn.addEventListener("click", async () => {
+    const email = document.getElementById("admin-email").value;
+    const password = document.getElementById("admin-password").value;
+    showLoader();
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+          if (ADMINS.includes(user.email)) {
+              currentUserRole = "admin";
+              showToast("Welcome, Admin!");
+              loginPanel.style.display = "none";
+              document.getElementById("posts").innerHTML = ""; // Clear old posts
+              loadPosts();
+          } else if (CREATORS.includes(user.email)) {
+              currentUserRole = "creator";
+              showToast("Welcome, Creator!");
+              tryPlayBirthdayTune(user);
+              loginPanel.style.display = "none";
+              document.getElementById("posts").innerHTML = ""; // Clear old posts
+              loadPosts();
+          } else {
+              currentUserRole = null;
+              showToast("Access Denied!");
+              loginPanel.style.display = "none";
+              signOut(auth);
+          }
+      }catch (error) {
+        showToast("Login Failed: " + error.message);
+        }
+        hideLoader();
+      });
+    toggleBtn.addEventListener("click", async () => {
+      const user = auth.currentUser;
+      if (user) {
+        loginPanel.style.display = "none";
+        await signOut(auth);
+        showLoader();
+        currentUserRole = null;
+        toggleBtn.innerText = "Admin Login";
+        document.getElementById("posts").innerHTML = ""; // Clear old posts
+        loadPosts();
+        showToast("Logged Out."); 
+        hideLoader();
+      }
+    });
+    onAuthStateChanged(auth, user => {
+      if (user && (ADMINS.includes(user.email) || CREATORS.includes(user.email))) {
+        toggleBtn.innerText = "Logout";
+      } else {
+        toggleBtn.innerText = "Admin Login";
+      }
+    });
+
+    // DOM Ready
+    document.getElementById("post-button").addEventListener("click", submitPost);
+    loadPosts();
+  </script>
+  <script>
+    function activateDarkMode() {
+      document.body.classList.toggle("dark-mode")
+    } 
+  </script>
+  <div class="footer">
+    Made with 💖 by Shashank — for my sister's smile.
+  </div>
+</body>
+</html>
